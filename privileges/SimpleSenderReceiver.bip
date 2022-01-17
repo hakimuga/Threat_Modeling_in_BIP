@@ -270,7 +270,7 @@ package SimpleSenderReceiver
         component Server server (1)
         component Server hacker (2)   
 
-        connector connector_type_Client_Server_Hacker ClientBuffer (client.Send, buffer.Receive, tester.Send)
+        connector connector_type_Client_Server ClientBuffer (client.Send, buffer.Receive, tester.Send)
         //connector connector_type_Client_Server ClientBuffer (client.Send, buffer.Receive)
         connector connector_type_Client_Server_habilitation BufferServer (buffer.Send, server.Receive)
         //connector connector_type_Client_Server_Hacker BufferServer (buffer.Send, server.Receive, hacker.Receive)
