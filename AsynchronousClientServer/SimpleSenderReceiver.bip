@@ -1,0 +1,248 @@
+@cpp(src="ext-cpp/utilities.cpp,ext-cpp/trace_helper.cpp,ext-cpp/proba_helper.cpp",include="utilities.hpp,trace_helper.hpp,proba_helper.hpp")
+package SimpleSenderReceiver
+
+    extern function int avg(int function_param_0, int function_param_1)
+
+
+    extern function printf(string function_param_0)
+
+    extern function printf(string function_param_0, int  function_param_1)
+
+    extern function printf(string function_param_0, int function_param_1, int function_param_2)
+    
+    extern function int proba()
+
+
+    extern data type buffer
+
+    extern data type identity
+    
+    extern function pushToBuff(buffer st, int m, identity id, int cid)
+    
+    extern function int pullFromBuff( buffer st)
+
+    extern function int pullMFromBuff( buffer st, int )
+
+    extern function int pullIDFromBuff( identity id, int )
+
+    extern function buffer init_buffer()
+
+    extern function identity init_identity()
+
+
+    const data int MAX = 10
+    
+    port type port_type_Silent ()
+    
+    port type port_type_mess (int m, int cid)
+
+
+    connector type connector_type_Client_Server (port_type_mess a, port_type_mess b)
+        define a  b'
+    
+        on b a
+            down {
+                b.m = a.m;
+	    b.cid=a.cid;
+            }
+        on b
+            down {
+               b.m = - 1;
+	   b.cid = - 1;
+           }
+    end
+
+    
+    atom type Buffer ()
+    
+        
+        data int capacity
+        
+        data int m
+
+        data int cid
+        
+        data int v
+    
+        data int index
+        
+        data buffer st
+
+        data identity id
+
+        export port port_type_mess Receive(m,cid)
+        
+        export port port_type_mess Send(m,cid)
+        
+        port port_type_Silent push()
+        
+        port port_type_Silent pull()
+        
+        port port_type_Silent checkMessage()
+        
+        place Init, S1, S2
+        initial to Init
+            do {
+                v = 0;
+                capacity = 0;
+                m = -1;
+	    st = init_buffer();
+	    id = init_identity();
+            }
+            
+            on push
+                from S1
+                to Init
+                provided (  (capacity  <  MAX)  && m!=-1 )
+                do {          
+		printf("PUSH TO BUFF \n");     
+		printf("MESSAGE = %d\n", m);                 
+                        pushToBuff(st, m, id, cid);
+		capacity = (capacity  +  1);
+
+                }
+            
+            on pull
+                from Init
+                to S2
+                provided ( (1  <=  capacity)  )
+                do {
+                        index = pullFromBuff(st);
+		printf("index = %d\n", index);     
+		m=pullMFromBuff(st, index);
+		cid=pullIDFromBuff(id, index);
+                        capacity = (capacity  -  1);
+
+		printf("PULL FROM BUFF \n");  
+		printf("ID = %d\n", cid);     
+		printf("MESSAGE = %d\n", m);     
+                }
+            
+            on Receive
+                from Init
+                to S1
+                provided ((capacity  <  MAX))
+                do {
+                        v = proba();
+		//printf("BUFF RECEIVE DATA \n");    
+		//printf("BUFFER SIZE = %d\n", buffer);  
+                }
+
+            on checkMessage
+                from S1
+                to Init
+                provided (m  ==  - 1)
+                do {
+		//printf("BUFF INCORRECT DATA \n");    
+		//printf("BUFFER SIZE = %d\n", buffer);     
+                }
+            
+            on Send
+                from S2
+                to Init
+                do {
+		//printf("BUFF SEND DATA \n");  
+		//printf("BUFFER SIZE = %d\n", buffer);       
+                }    
+    
+    end
+
+    
+    atom type Client (int c, int min, int max)
+       
+        data int m  
+        data int vc     
+        data int cid
+        export port port_type_mess Send(m,cid)
+        
+        port port_type_Silent produce()
+        
+        place Init, S1
+        initial to Init
+            do {
+                m = max;
+	    vc=c;
+	    cid=c;
+	    printf("var int c%d.m %d\n", vc, m);   
+	    //printf("var int s%d.id %d\n", vc, cid);   
+            }
+            
+            on produce
+                from Init
+                to S1
+                provided ((m  !=  - 1))
+                do {
+		printf("var int c%d.m %d\n", vc, m);
+	    	//printf("var int s%d.id %d\n", vc, cid);                          
+                }
+            
+            on Send
+                from S1
+                to Init
+                do {
+		printf("var int c%d.m %d\n", vc, m);     
+                        m=m-1; 
+		if(m==min) then m=max; fi
+                }    
+    
+    end
+
+    
+    atom type Server (int s)
+        data int m
+        data int vs
+        data int cid
+        export port port_type_mess Receive(m,cid)
+        
+        port port_type_Silent consume()
+        
+        port port_type_Silent NotAvailable()
+        
+        place Init, S1
+        initial to Init
+            do {
+                m = -1;
+	    vs=s;
+	    cid=-1;
+	    printf("var int s%d.m %d\n", vs, m);   
+	    printf("var int s%d.id %d\n", vs, cid);   
+            }
+            
+            on Receive
+                from Init
+                to S1
+                do {
+		//printf("var int s%d.m %d\n", s, m);                       
+                }
+            
+            on consume
+                from S1
+                to Init
+                provided ((m  !=  - 1))
+                do {
+		printf("var int s%d.m %d\n", vs, m);     
+	    	printf("var int s%d.id %d\n", vs, cid);                     
+                }
+            
+            on NotAvailable
+                from S1
+                to Init
+                provided ((m  ==  - 1))
+                do {
+		//printf("var int s%d.m %d\n", s, m);                       
+                }    
+    
+    end
+
+    
+    compound type Compound ()
+    
+        component Buffer buffer ()
+        component Client client (1,0,10)
+        component Server server (1)
+    
+        connector connector_type_Client_Server ClientBuffer (client.Send, buffer.Receive)
+        connector connector_type_Client_Server BufferServer (buffer.Send, server.Receive)
+    
+    end
+end
